@@ -4,6 +4,7 @@ LOCAL_PATH:= $(call my-dir)
 # and the host (as a static library for tools to use).
 
 common_SRC_FILES := \
+	buf.c \
 	SAX.c \
 	entities.c \
 	encoding.c \
