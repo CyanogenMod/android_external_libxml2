@@ -1540,7 +1540,7 @@ nsPush(xmlParserCtxtPtr ctxt, const xmlChar *prefix, const xmlChar *URL)
 {
     if (ctxt->options & XML_PARSE_NSCLEAN) {
         int i;
-	for (i = 0;i < ctxt->nsNr;i += 2) {
+	for (i = ctxt->nsNr - 2;i >= 0;i -= 2) {
 	    if (ctxt->nsTab[i] == prefix) {
 		/* in scope */
 	        if (ctxt->nsTab[i + 1] == URL)
@@ -2025,6 +2025,7 @@ static void xmlSHRINK (xmlParserCtxtPtr ctxt) {
 static void xmlGROW (xmlParserCtxtPtr ctxt) {
     if ((((ctxt->input->end - ctxt->input->cur) > XML_MAX_LOOKUP_LIMIT) ||
          ((ctxt->input->cur - ctxt->input->base) > XML_MAX_LOOKUP_LIMIT)) &&
+         ((ctxt->input->buf) && (ctxt->input->buf->readcallback != xmlNop)) &&
         ((ctxt->options & XML_PARSE_HUGE) == 0)) {
         xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR, "Huge input lookup");
         ctxt->instate = XML_PARSER_EOF;
@@ -3435,7 +3436,7 @@ xmlParseNCNameComplex(xmlParserCtxtPtr ctxt) {
 /**
  * xmlParseNCName:
  * @ctxt:  an XML parser context
- * @len:  lenght of the string parsed
+ * @len:  length of the string parsed
  *
  * parse an XML name.
  *
@@ -3934,7 +3935,7 @@ xmlParseAttValueComplex(xmlParserCtxtPtr ctxt, int *attlen, int normalize) {
         if ((len > XML_MAX_TEXT_LENGTH) &&
             ((ctxt->options & XML_PARSE_HUGE) == 0)) {
             xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                           "AttValue lenght too long\n");
+                           "AttValue length too long\n");
             goto mem_error;
         }
 	if (c == 0) break;
@@ -4075,7 +4076,7 @@ xmlParseAttValueComplex(xmlParserCtxtPtr ctxt, int *attlen, int normalize) {
         goto error;
 
     if ((in_space) && (normalize)) {
-        while (buf[len - 1] == 0x20) len--;
+        while ((len > 0) && (buf[len - 1] == 0x20)) len--;
     }
     buf[len] = 0;
     if (RAW == '<') {
@@ -4093,11 +4094,11 @@ xmlParseAttValueComplex(xmlParserCtxtPtr ctxt, int *attlen, int normalize) {
 
     /*
      * There we potentially risk an overflow, don't allow attribute value of
-     * lenght more than INT_MAX it is a very reasonnable assumption !
+     * length more than INT_MAX it is a very reasonnable assumption !
      */
     if (len >= INT_MAX) {
         xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                       "AttValue lenght too long\n");
+                       "AttValue length too long\n");
         goto mem_error;
     }
 
@@ -7515,7 +7516,7 @@ xmlParseEntityRef(xmlParserCtxtPtr ctxt) {
     NEXT;
 
     /*
-     * Predefined entites override any extra definition
+     * Predefined entities override any extra definition
      */
     if ((ctxt->options & XML_PARSE_OLDSAX) == 0) {
         ent = xmlGetPredefinedEntity(name);
@@ -7524,7 +7525,7 @@ xmlParseEntityRef(xmlParserCtxtPtr ctxt) {
     }
 
     /*
-     * Increate the number of entity references parsed
+     * Increase the number of entity references parsed
      */
     ctxt->nbentities++;
 
@@ -8897,7 +8898,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
                 if (((in - start) > XML_MAX_TEXT_LENGTH) &&
                     ((ctxt->options & XML_PARSE_HUGE) == 0)) {
                     xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                                   "AttValue lenght too long\n");
+                                   "AttValue length too long\n");
                     return(NULL);
                 }
 	    }
@@ -8919,7 +8920,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
                 if (((in - start) > XML_MAX_TEXT_LENGTH) &&
                     ((ctxt->options & XML_PARSE_HUGE) == 0)) {
                     xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                                   "AttValue lenght too long\n");
+                                   "AttValue length too long\n");
                     return(NULL);
                 }
 	    }
@@ -8948,7 +8949,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
                 if (((in - start) > XML_MAX_TEXT_LENGTH) &&
                     ((ctxt->options & XML_PARSE_HUGE) == 0)) {
                     xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                                   "AttValue lenght too long\n");
+                                   "AttValue length too long\n");
                     return(NULL);
                 }
 	    }
@@ -8956,7 +8957,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
         if (((in - start) > XML_MAX_TEXT_LENGTH) &&
             ((ctxt->options & XML_PARSE_HUGE) == 0)) {
             xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                           "AttValue lenght too long\n");
+                           "AttValue length too long\n");
             return(NULL);
         }
 	if (*in != limit) goto need_complex;
@@ -8978,7 +8979,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
                 if (((in - start) > XML_MAX_TEXT_LENGTH) &&
                     ((ctxt->options & XML_PARSE_HUGE) == 0)) {
                     xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                                   "AttValue lenght too long\n");
+                                   "AttValue length too long\n");
                     return(NULL);
                 }
 	    }
@@ -8987,7 +8988,7 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
         if (((in - start) > XML_MAX_TEXT_LENGTH) &&
             ((ctxt->options & XML_PARSE_HUGE) == 0)) {
             xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
-                           "AttValue lenght too long\n");
+                           "AttValue length too long\n");
             return(NULL);
         }
 	if (*in != limit) goto need_complex;
@@ -11633,7 +11634,7 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
 			    "PP: Parsing internal subset\n");
 #endif
 		    ctxt->inSubset = 1;
-                    ctxt->progressive = 1;
+                    ctxt->progressive = 0;
 		    ctxt->checkIndex = 0;
 		    xmlParseDocTypeDecl(ctxt);
 		    if (RAW == '[') {
@@ -12219,7 +12220,10 @@ xmldecl_done:
 	}
 	ctxt->instate = XML_PARSER_EOF;
     }
-    return((xmlParserErrors) ctxt->errNo);
+    if (ctxt->wellFormed == 0)
+	return((xmlParserErrors) ctxt->errNo);
+    else
+        return(0);
 }
 
 /************************************************************************
