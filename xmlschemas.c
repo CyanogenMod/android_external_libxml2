@@ -13946,7 +13946,7 @@ xmlSchemaCheckCOSNSSubset(xmlSchemaWildcardPtr sub,
     */
     if ((sub->negNsSet != NULL) &&
 	(super->negNsSet != NULL) &&
-	(sub->negNsSet->value == sub->negNsSet->value))
+	(sub->negNsSet->value == super->negNsSet->value))
 	return (0);
     /*
     * 3.1 sub must be a set whose members are either namespace names or �absent�.
@@ -18476,8 +18476,8 @@ xmlSchemaFixupComplexType(xmlSchemaParserCtxtPtr pctxt,
 		    particle->children->children =
 			(xmlSchemaTreeItemPtr) xmlSchemaAddParticle(pctxt,
 			type->node,
-			((xmlSchemaParticlePtr) type->subtypes)->minOccurs,
-			((xmlSchemaParticlePtr) type->subtypes)->maxOccurs);
+			((xmlSchemaParticlePtr) baseType->subtypes)->minOccurs,
+			((xmlSchemaParticlePtr) baseType->subtypes)->maxOccurs);
 		    if (particle->children->children == NULL)
 			goto exit_failure;
 		    particle = (xmlSchemaParticlePtr)

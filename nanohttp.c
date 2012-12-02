@@ -64,9 +64,6 @@
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
 #endif
-#ifdef SUPPORT_IP6
-#include <resolv.h>
-#endif
 #ifdef HAVE_ZLIB_H
 #include <zlib.h>
 #endif
@@ -1140,10 +1137,12 @@ xmlNanoHTTPConnectHost(const char *host, int port)
 			"Non-recoverable errors:  FORMERR, REFUSED, or NOTIMP.";
 		    break;
 
+#ifdef NO_ADDRESS
 		case NO_ADDRESS:
 		    h_err_txt =
 			"Valid name, no data record of requested type.";
 		    break;
+#endif
 
 		default:
 		    h_err_txt = "No error text defined.";
@@ -1166,7 +1165,7 @@ xmlNanoHTTPConnectHost(const char *host, int port)
 		memcpy (&ia, h->h_addr_list[i], h->h_length);
 		sockin.sin_family = h->h_addrtype;
 		sockin.sin_addr = ia;
-		sockin.sin_port = (u_short)htons ((unsigned short)port);
+		sockin.sin_port = (unsigned short)htons ((unsigned short)port);
 		addr = (struct sockaddr *) &sockin;
 #ifdef SUPPORT_IP6
 	    } else if (have_ipv6 () && (h->h_addrtype == AF_INET6)) {
