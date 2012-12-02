@@ -520,10 +520,11 @@ endTimer(char *format, ...)
      * We cannot do anything because we don't have a timing function
      */
 #ifdef HAVE_STDARG_H
+    va_list ap;
     va_start(ap, format);
     vfprintf(stderr, format, ap);
     va_end(ap);
-    fprintf(stderr, " was not timed\n", msec);
+    fprintf(stderr, " was not timed\n");
 #else
     /* We don't have gettimeofday, time or stdarg.h, what crazy world is
      * this ?!
@@ -2073,7 +2074,7 @@ static void doXPathDump(xmlXPathObjectPtr cur) {
 #ifdef LIBXML_OUTPUT_ENABLED
             xmlSaveCtxtPtr ctxt;
 
-            if (cur->nodesetval->nodeNr <= 0) {
+            if ((cur->nodesetval == NULL) || (cur->nodesetval->nodeNr <= 0)) {
                 fprintf(stderr, "XPath set is empty\n");
                 progresult = XMLLINT_ERR_XPATH;
                 break;
@@ -3364,11 +3365,11 @@ main(int argc, char **argv) {
 	     i++;
 #ifdef LIBXML_OUTPUT_ENABLED
 	     format = atoi(argv[i]);
-#endif /* LIBXML_OUTPUT_ENABLED */
 	     if (format == 1) {
 	         noblanks++;
 	         xmlKeepBlanksDefault(0);
 	     }
+#endif /* LIBXML_OUTPUT_ENABLED */
 	}
 #ifdef LIBXML_READER_ENABLED
 	else if ((!strcmp(argv[i], "-stream")) ||

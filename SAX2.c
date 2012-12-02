@@ -1756,7 +1756,6 @@ void
 xmlSAX2EndElement(void *ctx, const xmlChar *name ATTRIBUTE_UNUSED)
 {
     xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;
-    xmlParserNodeInfo node_info;
     xmlNodePtr cur;
 
     if (ctx == NULL) return;
@@ -1770,10 +1769,10 @@ xmlSAX2EndElement(void *ctx, const xmlChar *name ATTRIBUTE_UNUSED)
     
     /* Capture end position and add node */
     if (cur != NULL && ctxt->record_info) {
-      node_info.end_pos = ctxt->input->cur - ctxt->input->base;
-      node_info.end_line = ctxt->input->line;
-      node_info.node = cur;
-      xmlParserAddNodeInfo(ctxt, &node_info);
+      ctxt->nodeInfo->end_pos = ctxt->input->cur - ctxt->input->base;
+      ctxt->nodeInfo->end_line = ctxt->input->line;
+      ctxt->nodeInfo->node = cur;
+      xmlParserAddNodeInfo(ctxt, ctxt->nodeInfo);
     }
     ctxt->nodemem = -1;
 
@@ -2243,7 +2242,7 @@ xmlSAX2StartElementNs(void *ctx,
 	}
     }
 
-    if ((ctxt->myDoc->children == NULL) || (parent == NULL)) {
+    if (parent == NULL) {
         xmlAddChild((xmlNodePtr) ctxt->myDoc, (xmlNodePtr) ret);
     }
     /*
@@ -2641,7 +2640,7 @@ xmlSAX2ProcessingInstruction(void *ctx, const xmlChar *target,
 	xmlAddChild((xmlNodePtr) ctxt->myDoc->extSubset, ret);
 	return;
     }
-    if ((ctxt->myDoc->children == NULL) || (parent == NULL)) {
+    if (parent == NULL) {
 #ifdef DEBUG_SAX_TREE
 	    xmlGenericError(xmlGenericErrorContext,
 		    "Setting PI %s as root\n", target);
@@ -2702,7 +2701,7 @@ xmlSAX2Comment(void *ctx, const xmlChar *value)
 	xmlAddChild((xmlNodePtr) ctxt->myDoc->extSubset, ret);
 	return;
     }
-    if ((ctxt->myDoc->children == NULL) || (parent == NULL)) {
+    if (parent == NULL) {
 #ifdef DEBUG_SAX_TREE
 	    xmlGenericError(xmlGenericErrorContext,
 		    "Setting xmlSAX2Comment as root\n");
