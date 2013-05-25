@@ -107,7 +107,7 @@
 #endif
 
 #define UNBOUNDED (1 << 30)
-#define TODO 								\
+#define TODO								\
     xmlGenericError(xmlGenericErrorContext,				\
 	    "Unimplemented block at %s:%d\n",				\
             __FILE__, __LINE__);
@@ -975,6 +975,7 @@ struct _xmlSchemaValidCtxt {
     xmlSAXHandlerPtr sax;
     xmlParserCtxtPtr parserCtxt;
     void *user_data; /* TODO: What is this for? */
+    char *filename;
 
     int err;
     int nberrors;
@@ -1028,6 +1029,10 @@ struct _xmlSchemaValidCtxt {
     int hasKeyrefs;
     int createIDCNodeTables;
     int psviExposeIDCNodeTables;
+
+    /* Locator for error reporting in streaming mode */
+    xmlSchemaValidityLocatorFunc locFunc;
+    void *locCtxt;
 };
 
 /**
@@ -1043,9 +1048,9 @@ struct _xmlSchemaSubstGroup {
 };
 
 /************************************************************************
- * 									*
- * 			Some predeclarations				*
- * 									*
+ *									*
+ *			Some predeclarations				*
+ *									*
  ************************************************************************/
 
 static int xmlSchemaParseInclude(xmlSchemaParserCtxtPtr ctxt,
@@ -1098,7 +1103,7 @@ xmlSchemaParseAttributeGroupRef(xmlSchemaParserCtxtPtr pctxt,
 
 /************************************************************************
  *									*
- * 			Helper functions			        *
+ *			Helper functions			        *
  *									*
  ************************************************************************/
 
@@ -1836,7 +1841,7 @@ xmlSchemaFormatFacetEnumSet(xmlSchemaAbstractCtxtPtr actxt,
 
 /************************************************************************
  *									*
- * 			Error functions				        *
+ *			Error functions				        *
  *									*
  ************************************************************************/
 
@@ -1974,7 +1979,7 @@ xmlSchemaPErrExt(xmlSchemaParserCtxtPtr ctxt, xmlNodePtr node, int error,
 
 /************************************************************************
  *									*
- * 			Allround error functions			*
+ *			Allround error functions			*
  *									*
  ************************************************************************/
 
@@ -2078,6 +2083,20 @@ xmlSchemaErr4Line(xmlSchemaAbstractCtxtPtr ctxt,
 		    (vctxt->parserCtxt->input != NULL))
 		    file = vctxt->parserCtxt->input->filename;
 	    }
+	    if (vctxt->locFunc != NULL) {
+	        if ((file == NULL) || (line == 0)) {
+		    unsigned long l;
+		    const char *f;
+		    vctxt->locFunc(vctxt->locCtxt, &f, &l);
+		    if (file == NULL)
+		        file = f;
+		    if (line == 0)
+		        line = (int) l;
+		}
+	    }
+	    if ((file == NULL) && (vctxt->filename != NULL))
+	        file = vctxt->filename;
+
 	    __xmlRaiseError(schannel, channel, data, ctxt,
 		node, XML_FROM_SCHEMASV,
 		error, errorLevel, file, line,
@@ -3199,25 +3218,25 @@ xmlSchemaPContentErr(xmlSchemaParserCtxtPtr ctxt,
 }
 
 /************************************************************************
- * 									*
- * 			Streamable error functions                      *
- * 									*
+ *									*
+ *			Streamable error functions                      *
+ *									*
  ************************************************************************/
 
 
 
 
 /************************************************************************
- * 									*
- * 			Validation helper functions			*
- * 									*
+ *									*
+ *			Validation helper functions			*
+ *									*
  ************************************************************************/
 
 
 /************************************************************************
- * 									*
- * 			Allocation functions				*
- * 									*
+ *									*
+ *			Allocation functions				*
+ *									*
  ************************************************************************/
 
 /**
@@ -4135,9 +4154,9 @@ xmlSchemaFree(xmlSchemaPtr schema)
 }
 
 /************************************************************************
- * 									*
- * 			Debug functions					*
- * 									*
+ *									*
+ *			Debug functions					*
+ *									*
  ************************************************************************/
 
 #ifdef LIBXML_OUTPUT_ENABLED
@@ -4587,7 +4606,7 @@ xmlSchemaDebugDumpIDCTable(FILE * output,
 
 /************************************************************************
  *									*
- * 			Utilities					*
+ *			Utilities					*
  *									*
  ************************************************************************/
 
@@ -4692,9 +4711,9 @@ xmlSchemaGetProp(xmlSchemaParserCtxtPtr ctxt, xmlNodePtr node,
 }
 
 /************************************************************************
- * 									*
- * 			Parsing functions				*
- * 									*
+ *									*
+ *			Parsing functions				*
+ *									*
  ************************************************************************/
 
 #define WXS_FIND_GLOBAL_ITEM(slot)			\
@@ -4966,9 +4985,9 @@ xmlSchemaGetNamedComponent(xmlSchemaPtr schema,
 }
 
 /************************************************************************
- * 									*
- * 			Parsing functions				*
- * 									*
+ *									*
+ *			Parsing functions				*
+ *									*
  ************************************************************************/
 
 #define IS_BLANK_NODE(n)						\
@@ -5743,9 +5762,9 @@ xmlSchemaAddElementSubstitutionMember(xmlSchemaParserCtxtPtr pctxt,
 }
 
 /************************************************************************
- * 									*
+ *									*
  *		Utilities for parsing					*
- * 									*
+ *									*
  ************************************************************************/
 
 /**
@@ -5939,7 +5958,7 @@ xmlSchemaPValAttrNodeID(xmlSchemaParserCtxtPtr ctxt, xmlAttrPtr attr)
 		xmlFree((xmlChar *) value);
 		value = strip;
 	    }
-    	    res = xmlAddID(NULL, attr->doc, value, attr);
+	    res = xmlAddID(NULL, attr->doc, value, attr);
 	    if (res == NULL) {
 		ret = XML_SCHEMAP_S4S_ATTR_INVALID_VALUE;
 		xmlSchemaPSimpleTypeErr(ctxt,
@@ -6191,9 +6210,9 @@ xmlGetBooleanProp(xmlSchemaParserCtxtPtr ctxt,
 }
 
 /************************************************************************
- * 									*
+ *									*
  *		Shema extraction from an Infoset			*
- * 									*
+ *									*
  ************************************************************************/
 static xmlSchemaTypePtr xmlSchemaParseSimpleType(xmlSchemaParserCtxtPtr
                                                  ctxt, xmlSchemaPtr schema,
@@ -6797,7 +6816,7 @@ xmlSchemaParseWildcardNs(xmlSchemaParserCtxtPtr ctxt,
 		    tmp->next = NULL;
 		    if (wildc->nsSet == NULL)
 			wildc->nsSet = tmp;
-		    else
+		    else if (lastNs != NULL)
 			lastNs->next = tmp;
 		    lastNs = tmp;
 		}
@@ -8227,7 +8246,7 @@ xmlSchemaParseIDCSelectorAndField(xmlSchemaParserCtxtPtr ctxt,
     */
     attr = xmlSchemaGetPropNode(node, "xpath");
     if (attr == NULL) {
-    	xmlSchemaPMissingAttrErr(ctxt,
+	xmlSchemaPMissingAttrErr(ctxt,
 	    XML_SCHEMAP_S4S_ATTR_MISSING,
 	    NULL, node,
 	    "name", NULL);
@@ -10343,27 +10362,39 @@ xmlSchemaAddSchemaDoc(xmlSchemaParserCtxtPtr pctxt,
 
     /* Did we already fetch the doc? */
     if (bkt != NULL) {
-	/* TODO: The following nasty cases will produce an error. */
 	if ((WXS_IS_BUCKET_IMPMAIN(type)) && (! bkt->imported)) {
-	    /* We included/redefined and then try to import a schema. */
+	    /*
+	    * We included/redefined and then try to import a schema,
+	    * but the new location provided for import was different.
+	    */
 	    if (schemaLocation == NULL)
 		schemaLocation = BAD_CAST "in_memory_buffer";
-	    xmlSchemaCustomErr(ACTXT_CAST pctxt, err,
-		invokingNode, NULL,
-		"The schema document '%s' cannot be imported, since "
-		"it was already included or redefined",
-		schemaLocation, NULL);
-	    goto exit;
+	    if (!xmlStrEqual(schemaLocation,
+		bkt->schemaLocation)) {
+		xmlSchemaCustomErr(ACTXT_CAST pctxt, err,
+		    invokingNode, NULL,
+		    "The schema document '%s' cannot be imported, since "
+		    "it was already included or redefined",
+		    schemaLocation, NULL);
+		goto exit;
+	    }
 	} else if ((! WXS_IS_BUCKET_IMPMAIN(type)) && (bkt->imported)) {
-	    /* We imported and then try to include/redefine a schema. */
+	    /*
+	    * We imported and then try to include/redefine a schema,
+	    * but the new location provided for the include/redefine
+	    * was different.
+	    */
 	    if (schemaLocation == NULL)
 		schemaLocation = BAD_CAST "in_memory_buffer";
-	    xmlSchemaCustomErr(ACTXT_CAST pctxt, err,
-		invokingNode, NULL,
-		"The schema document '%s' cannot be included or "
-		"redefined, since it was already imported",
-		schemaLocation, NULL);
-	    goto exit;
+	    if (!xmlStrEqual(schemaLocation,
+		bkt->schemaLocation)) {
+		xmlSchemaCustomErr(ACTXT_CAST pctxt, err,
+		    invokingNode, NULL,
+		    "The schema document '%s' cannot be included or "
+		    "redefined, since it was already imported",
+		    schemaLocation, NULL);
+		goto exit;
+	    }
 	}
     }
 
@@ -10519,9 +10550,9 @@ doc_load:
 	    /* Parse from memory buffer. */
 	    doc = xmlCtxtReadMemory(parserCtxt, schemaBuffer, schemaBufferLen,
 		NULL, NULL, SCHEMAS_PARSE_OPTIONS);
-	    schemaLocation = xmlStrdup(BAD_CAST "in_memory_buffer");
+	    schemaLocation = BAD_CAST "in_memory_buffer";
 	    if (doc != NULL)
-		doc->URL = schemaLocation;
+		doc->URL = xmlStrdup(schemaLocation);
 	}
 	/*
 	* For <import>:
@@ -11027,14 +11058,15 @@ xmlSchemaParseIncludeOrRedefine(xmlSchemaParserCtxtPtr pctxt,
 	    */
 	    isChameleon = 1;
 	    if (bucket->parsed &&
-		(bucket->targetNamespace != pctxt->targetNamespace)) {
-		/*
-		* This is a sanity check, I dunno yet if this can happen.
-		*/
-		PERROR_INT("xmlSchemaParseIncludeOrRedefine",
-		    "trying to use an already parsed schema for a "
-		    "different targetNamespace");
-		return(-1);
+		bucket->origTargetNamespace != NULL) {
+		xmlSchemaCustomErr(ACTXT_CAST pctxt,
+		    XML_SCHEMAP_SRC_INCLUDE,
+		    node, NULL,
+		    "The target namespace of the included/redefined schema "
+		    "'%s' has to be absent or the same as the "
+		    "including/redefining schema's target namespace",
+		    schemaLocation, NULL);
+		goto exit_error;
 	    }
 	    bucket->targetNamespace = pctxt->targetNamespace;
 	}
@@ -12340,15 +12372,15 @@ xmlSchemaParseComplexType(xmlSchemaParserCtxtPtr ctxt, xmlSchemaPtr schema,
 }
 
 /************************************************************************
- * 									*
- * 			Validating using Schemas			*
- * 									*
+ *									*
+ *			Validating using Schemas			*
+ *									*
  ************************************************************************/
 
 /************************************************************************
- * 									*
- * 			Reading/Writing Schemas				*
- * 									*
+ *									*
+ *			Reading/Writing Schemas				*
+ *									*
  ************************************************************************/
 
 #if 0 /* Will be enabled if it is clear what options are needed. */
@@ -12512,7 +12544,12 @@ xmlSchemaFreeParserCtxt(xmlSchemaParserCtxtPtr ctxt)
  *									*
  ************************************************************************/
 
-static void
+/**
+ * xmlSchemaBuildContentModelForSubstGroup:
+ *
+ * Returns 1 if nillable, 0 otherwise
+ */
+static int
 xmlSchemaBuildContentModelForSubstGroup(xmlSchemaParserCtxtPtr pctxt,
 	xmlSchemaParticlePtr particle, int counter, xmlAutomataStatePtr end)
 {
@@ -12520,6 +12557,7 @@ xmlSchemaBuildContentModelForSubstGroup(xmlSchemaParserCtxtPtr pctxt,
     xmlSchemaElementPtr elemDecl, member;
     xmlSchemaSubstGroupPtr substGroup;
     int i;
+    int ret = 0;
 
     elemDecl = (xmlSchemaElementPtr) particle->children;
     /*
@@ -12535,7 +12573,7 @@ xmlSchemaBuildContentModelForSubstGroup(xmlSchemaParserCtxtPtr pctxt,
 	    "Internal error: xmlSchemaBuildContentModelForSubstGroup, "
 	    "declaration is marked having a subst. group but none "
 	    "available.\n", elemDecl->name, NULL);
-	return;
+	return(0);
     }
     if (counter >= 0) {
 	/*
@@ -12615,21 +12653,31 @@ xmlSchemaBuildContentModelForSubstGroup(xmlSchemaParserCtxtPtr pctxt,
 	xmlAutomataNewCountedTrans(pctxt->am, hop, start, counter);
 	xmlAutomataNewCounterTrans(pctxt->am, hop, end, counter);
     }
-    if (particle->minOccurs == 0)
+    if (particle->minOccurs == 0) {
 	xmlAutomataNewEpsilon(pctxt->am, start, end);
+        ret = 1;
+    }
     pctxt->state = end;
+    return(ret);
 }
 
-static void
+/**
+ * xmlSchemaBuildContentModelForElement:
+ *
+ * Returns 1 if nillable, 0 otherwise
+ */
+static int
 xmlSchemaBuildContentModelForElement(xmlSchemaParserCtxtPtr ctxt,
 				     xmlSchemaParticlePtr particle)
 {
+    int ret = 0;
+
     if (((xmlSchemaElementPtr) particle->children)->flags &
 	XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD) {
 	/*
 	* Substitution groups.
 	*/
-	xmlSchemaBuildContentModelForSubstGroup(ctxt, particle, -1, NULL);
+	ret = xmlSchemaBuildContentModelForSubstGroup(ctxt, particle, -1, NULL);
     } else {
 	xmlSchemaElementPtr elemDecl;
 	xmlAutomataStatePtr start;
@@ -12637,7 +12685,7 @@ xmlSchemaBuildContentModelForElement(xmlSchemaParserCtxtPtr ctxt,
 	elemDecl = (xmlSchemaElementPtr) particle->children;
 
 	if (elemDecl->flags & XML_SCHEMAS_ELEM_ABSTRACT)
-	    return;
+	    return(0);
 	if (particle->maxOccurs == 1) {
 	    start = ctxt->state;
 	    ctxt->state = xmlAutomataNewTransition2(ctxt->am, start, NULL,
@@ -12665,9 +12713,12 @@ xmlSchemaBuildContentModelForElement(xmlSchemaParserCtxtPtr ctxt,
 	    ctxt->state = xmlAutomataNewCounterTrans(ctxt->am, ctxt->state,
 		NULL, counter);
 	}
-	if (particle->minOccurs == 0)
+	if (particle->minOccurs == 0) {
 	    xmlAutomataNewEpsilon(ctxt->am, start, ctxt->state);
+            ret = 1;
+        }
     }
+    return(ret);
 }
 
 /**
@@ -12678,21 +12729,24 @@ xmlSchemaBuildContentModelForElement(xmlSchemaParserCtxtPtr ctxt,
  *
  * Create the automaton for the {content type} of a complex type.
  *
+ * Returns 1 if the content is nillable, 0 otherwise
  */
-static void
+static int
 xmlSchemaBuildAContentModel(xmlSchemaParserCtxtPtr pctxt,
 			    xmlSchemaParticlePtr particle)
 {
+    int ret = 0, tmp2;
+
     if (particle == NULL) {
 	PERROR_INT("xmlSchemaBuildAContentModel", "particle is NULL");
-	return;
+	return(1);
     }
     if (particle->children == NULL) {
 	/*
 	* Just return in this case. A missing "term" of the particle
 	* might arise due to an invalid "term" component.
 	*/
-	return;
+	return(1);
     }
 
     switch (particle->children->type) {
@@ -12744,7 +12798,8 @@ xmlSchemaBuildAContentModel(xmlSchemaParserCtxtPtr pctxt,
 		int counter;
 		xmlAutomataStatePtr hop;
 		int maxOccurs =
-		    particle->maxOccurs == UNBOUNDED ? UNBOUNDED : particle->maxOccurs - 1;
+		    particle->maxOccurs == UNBOUNDED ? UNBOUNDED :
+                                           particle->maxOccurs - 1;
 		int minOccurs =
 		    particle->minOccurs < 1 ? 0 : particle->minOccurs - 1;
 
@@ -12779,243 +12834,282 @@ xmlSchemaBuildAContentModel(xmlSchemaParserCtxtPtr pctxt,
 	    }
 	    if (particle->minOccurs == 0) {
 		xmlAutomataNewEpsilon(pctxt->am, start, end);
+                ret = 1;
 	    }
 	    pctxt->state = end;
             break;
 	}
         case XML_SCHEMA_TYPE_ELEMENT:
-	    xmlSchemaBuildContentModelForElement(pctxt, particle);
+	    ret = xmlSchemaBuildContentModelForElement(pctxt, particle);
 	    break;
         case XML_SCHEMA_TYPE_SEQUENCE:{
-                xmlSchemaTreeItemPtr sub;
+            xmlSchemaTreeItemPtr sub;
 
-                /*
-                 * If max and min occurances are default (1) then
-                 * simply iterate over the particles of the <sequence>.
-                 */
-                if ((particle->minOccurs == 1) && (particle->maxOccurs == 1)) {
-                    sub = particle->children->children;
-                    while (sub != NULL) {
-                        xmlSchemaBuildAContentModel(pctxt,
-			    (xmlSchemaParticlePtr) sub);
-                        sub = sub->next;
-                    }
-                } else {
-                    xmlAutomataStatePtr oldstate = pctxt->state;
+            ret = 1;
+            /*
+             * If max and min occurances are default (1) then
+             * simply iterate over the particles of the <sequence>.
+             */
+            if ((particle->minOccurs == 1) && (particle->maxOccurs == 1)) {
+                sub = particle->children->children;
 
-                    if (particle->maxOccurs >= UNBOUNDED) {
-                        if (particle->minOccurs > 1) {
-                            xmlAutomataStatePtr tmp;
-                            int counter;
+                while (sub != NULL) {
+                    tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                    if (tmp2 != 1) ret = 0;
+                    sub = sub->next;
+                }
+            } else {
+                xmlAutomataStatePtr oldstate = pctxt->state;
 
-                            pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
-				oldstate, NULL);
-                            oldstate = pctxt->state;
-
-                            counter = xmlAutomataNewCounter(pctxt->am,
-				particle->minOccurs - 1, UNBOUNDED);
-
-                            sub = particle->children->children;
-                            while (sub != NULL) {
-                                xmlSchemaBuildAContentModel(pctxt,
-				    (xmlSchemaParticlePtr) sub);
-                                sub = sub->next;
-                            }
-                            tmp = pctxt->state;
-                            xmlAutomataNewCountedTrans(pctxt->am, tmp,
-                                                       oldstate, counter);
-                            pctxt->state =
-                                xmlAutomataNewCounterTrans(pctxt->am, tmp,
-                                                           NULL, counter);
-
-                        } else {
-                            pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
-				oldstate, NULL);
-                            oldstate = pctxt->state;
-
-			    sub = particle->children->children;
-                            while (sub != NULL) {
-                                xmlSchemaBuildAContentModel(pctxt,
-				    (xmlSchemaParticlePtr) sub);
-                                sub = sub->next;
-                            }
-                            xmlAutomataNewEpsilon(pctxt->am, pctxt->state,
-                                                  oldstate);
-			    /*
-			     * epsilon needed to block previous trans from
-			     * being allowed to enter back from another
-			     * construct
-			     */
-			    pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
-						pctxt->state, NULL);
-                            if (particle->minOccurs == 0) {
-                                xmlAutomataNewEpsilon(pctxt->am,
-				    oldstate, pctxt->state);
-                            }
-                        }
-                    } else if ((particle->maxOccurs > 1)
-                               || (particle->minOccurs > 1)) {
+                if (particle->maxOccurs >= UNBOUNDED) {
+                    if (particle->minOccurs > 1) {
                         xmlAutomataStatePtr tmp;
                         int counter;
 
                         pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
-			    oldstate, NULL);
+                            oldstate, NULL);
                         oldstate = pctxt->state;
 
                         counter = xmlAutomataNewCounter(pctxt->am,
-			    particle->minOccurs - 1,
-			    particle->maxOccurs - 1);
+                            particle->minOccurs - 1, UNBOUNDED);
 
                         sub = particle->children->children;
                         while (sub != NULL) {
-                            xmlSchemaBuildAContentModel(pctxt,
-				(xmlSchemaParticlePtr) sub);
+                            tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                            (xmlSchemaParticlePtr) sub);
+                            if (tmp2 != 1) ret = 0;
                             sub = sub->next;
                         }
                         tmp = pctxt->state;
-                        xmlAutomataNewCountedTrans(pctxt->am,
-			    tmp, oldstate, counter);
+                        xmlAutomataNewCountedTrans(pctxt->am, tmp,
+                                                   oldstate, counter);
                         pctxt->state =
-                            xmlAutomataNewCounterTrans(pctxt->am, tmp, NULL,
-                                                       counter);
-                        if (particle->minOccurs == 0) {
+                            xmlAutomataNewCounterTrans(pctxt->am, tmp,
+                                                       NULL, counter);
+                        if (ret == 1)
                             xmlAutomataNewEpsilon(pctxt->am,
-				oldstate, pctxt->state);
-                        }
+                                                oldstate, pctxt->state);
+
                     } else {
+                        pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
+                            oldstate, NULL);
+                        oldstate = pctxt->state;
+
                         sub = particle->children->children;
                         while (sub != NULL) {
-                            xmlSchemaBuildAContentModel(pctxt,
-				(xmlSchemaParticlePtr) sub);
+                            tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                            if (tmp2 != 1) ret = 0;
                             sub = sub->next;
                         }
+                        xmlAutomataNewEpsilon(pctxt->am, pctxt->state,
+                                              oldstate);
+                        /*
+                         * epsilon needed to block previous trans from
+                         * being allowed to enter back from another
+                         * construct
+                         */
+                        pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
+                                            pctxt->state, NULL);
                         if (particle->minOccurs == 0) {
-                            xmlAutomataNewEpsilon(pctxt->am, oldstate,
-                                                  pctxt->state);
+                            xmlAutomataNewEpsilon(pctxt->am,
+                                oldstate, pctxt->state);
+                            ret = 1;
                         }
                     }
-                }
-                break;
-            }
-        case XML_SCHEMA_TYPE_CHOICE:{
-                xmlSchemaTreeItemPtr sub;
-                xmlAutomataStatePtr start, end;
+                } else if ((particle->maxOccurs > 1)
+                           || (particle->minOccurs > 1)) {
+                    xmlAutomataStatePtr tmp;
+                    int counter;
 
-                start = pctxt->state;
-                end = xmlAutomataNewState(pctxt->am);
+                    pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
+                        oldstate, NULL);
+                    oldstate = pctxt->state;
 
-                /*
-                 * iterate over the subtypes and remerge the end with an
-                 * epsilon transition
-                 */
-                if (particle->maxOccurs == 1) {
-		    sub = particle->children->children;
+                    counter = xmlAutomataNewCounter(pctxt->am,
+                        particle->minOccurs - 1,
+                        particle->maxOccurs - 1);
+
+                    sub = particle->children->children;
                     while (sub != NULL) {
-                        pctxt->state = start;
-                        xmlSchemaBuildAContentModel(pctxt,
-			    (xmlSchemaParticlePtr) sub);
-                        xmlAutomataNewEpsilon(pctxt->am, pctxt->state, end);
+                        tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                        if (tmp2 != 1) ret = 0;
                         sub = sub->next;
+                    }
+                    tmp = pctxt->state;
+                    xmlAutomataNewCountedTrans(pctxt->am,
+                        tmp, oldstate, counter);
+                    pctxt->state =
+                        xmlAutomataNewCounterTrans(pctxt->am, tmp, NULL,
+                                                   counter);
+                    if ((particle->minOccurs == 0) || (ret == 1)) {
+                        xmlAutomataNewEpsilon(pctxt->am,
+                                            oldstate, pctxt->state);
+                        ret = 1;
                     }
                 } else {
-                    int counter;
-                    xmlAutomataStatePtr hop, base;
-                    int maxOccurs = particle->maxOccurs == UNBOUNDED ?
-                        UNBOUNDED : particle->maxOccurs - 1;
-                    int minOccurs =
-                        particle->minOccurs < 1 ? 0 : particle->minOccurs - 1;
-
-                    /*
-                     * use a counter to keep track of the number of transtions
-                     * which went through the choice.
-                     */
-                    counter =
-                        xmlAutomataNewCounter(pctxt->am, minOccurs, maxOccurs);
-                    hop = xmlAutomataNewState(pctxt->am);
-                    base = xmlAutomataNewState(pctxt->am);
-
-		    sub = particle->children->children;
+                    sub = particle->children->children;
                     while (sub != NULL) {
-                        pctxt->state = base;
-                        xmlSchemaBuildAContentModel(pctxt,
-			    (xmlSchemaParticlePtr) sub);
-                        xmlAutomataNewEpsilon(pctxt->am, pctxt->state, hop);
+                        tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                        if (tmp2 != 1) ret = 0;
                         sub = sub->next;
                     }
-                    xmlAutomataNewEpsilon(pctxt->am, start, base);
-		    xmlAutomataNewCountedTrans(pctxt->am, hop, base, counter);
-                    xmlAutomataNewCounterTrans(pctxt->am, hop, end, counter);
-                }
-                if (particle->minOccurs == 0) {
-                    xmlAutomataNewEpsilon(pctxt->am, start, end);
-                }
-                pctxt->state = end;
-                break;
-            }
-        case XML_SCHEMA_TYPE_ALL:{
-                xmlAutomataStatePtr start;
-		xmlSchemaParticlePtr sub;
-		xmlSchemaElementPtr elemDecl;
-                int lax;
 
-		sub = (xmlSchemaParticlePtr) particle->children->children;
-                if (sub == NULL)
-                    break;
-                start = pctxt->state;
+		    /*
+		     * epsilon needed to block previous trans from
+		     * being allowed to enter back from another
+		     * construct
+		     */
+		    pctxt->state = xmlAutomataNewEpsilon(pctxt->am,
+					pctxt->state, NULL);
+
+                    if (particle->minOccurs == 0) {
+                        xmlAutomataNewEpsilon(pctxt->am, oldstate,
+                                              pctxt->state);
+                        ret = 1;
+                    }
+                }
+            }
+            break;
+        }
+        case XML_SCHEMA_TYPE_CHOICE:{
+            xmlSchemaTreeItemPtr sub;
+            xmlAutomataStatePtr start, end;
+
+            ret = 0;
+            start = pctxt->state;
+            end = xmlAutomataNewState(pctxt->am);
+
+            /*
+             * iterate over the subtypes and remerge the end with an
+             * epsilon transition
+             */
+            if (particle->maxOccurs == 1) {
+                sub = particle->children->children;
                 while (sub != NULL) {
                     pctxt->state = start;
-
-		    elemDecl = (xmlSchemaElementPtr) sub->children;
-		    if (elemDecl == NULL) {
-			PERROR_INT("xmlSchemaBuildAContentModel",
-			    "<element> particle has no term");
-			return;
-		    };
-		    /*
-		    * NOTE: The {max occurs} of all the particles in the
-		    * {particles} of the group must be 0 or 1; this is
-		    * already ensured during the parse of the content of
-		    * <all>.
-		    */
-		    if (elemDecl->flags & XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD) {
-			int counter;
-
-		        /*
-			 * This is an abstract group, we need to share
-			 * the same counter for all the element transitions
-			 * derived from the group
-			 */
-			counter = xmlAutomataNewCounter(pctxt->am,
-			                   sub->minOccurs, sub->maxOccurs);
-			xmlSchemaBuildContentModelForSubstGroup(pctxt,
-					   sub, counter, pctxt->state);
-		    } else {
-			if ((sub->minOccurs == 1) &&
-			    (sub->maxOccurs == 1)) {
-			    xmlAutomataNewOnceTrans2(pctxt->am, pctxt->state,
-						    pctxt->state,
-						    elemDecl->name,
-						    elemDecl->targetNamespace,
-						    1, 1, elemDecl);
-			} else if ((sub->minOccurs == 0) &&
-			    (sub->maxOccurs == 1)) {
-
-			    xmlAutomataNewCountTrans2(pctxt->am, pctxt->state,
-						     pctxt->state,
-						     elemDecl->name,
-						     elemDecl->targetNamespace,
-						     0,
-						     1,
-						     elemDecl);
-			}
-		    }
-                    sub = (xmlSchemaParticlePtr) sub->next;
+                    tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                    if (tmp2 == 1) ret = 1;
+                    xmlAutomataNewEpsilon(pctxt->am, pctxt->state, end);
+                    sub = sub->next;
                 }
-                lax = particle->minOccurs == 0;
-                pctxt->state =
-                    xmlAutomataNewAllTrans(pctxt->am, pctxt->state, NULL, lax);
-                break;
+            } else {
+                int counter;
+                xmlAutomataStatePtr hop, base;
+                int maxOccurs = particle->maxOccurs == UNBOUNDED ?
+                    UNBOUNDED : particle->maxOccurs - 1;
+                int minOccurs =
+                    particle->minOccurs < 1 ? 0 : particle->minOccurs - 1;
+
+                /*
+                 * use a counter to keep track of the number of transtions
+                 * which went through the choice.
+                 */
+                counter =
+                    xmlAutomataNewCounter(pctxt->am, minOccurs, maxOccurs);
+                hop = xmlAutomataNewState(pctxt->am);
+                base = xmlAutomataNewState(pctxt->am);
+
+                sub = particle->children->children;
+                while (sub != NULL) {
+                    pctxt->state = base;
+                    tmp2 = xmlSchemaBuildAContentModel(pctxt,
+                                        (xmlSchemaParticlePtr) sub);
+                    if (tmp2 == 1) ret = 1;
+                    xmlAutomataNewEpsilon(pctxt->am, pctxt->state, hop);
+                    sub = sub->next;
+                }
+                xmlAutomataNewEpsilon(pctxt->am, start, base);
+                xmlAutomataNewCountedTrans(pctxt->am, hop, base, counter);
+                xmlAutomataNewCounterTrans(pctxt->am, hop, end, counter);
+                if (ret == 1)
+                    xmlAutomataNewEpsilon(pctxt->am, base, end);
             }
+            if (particle->minOccurs == 0) {
+                xmlAutomataNewEpsilon(pctxt->am, start, end);
+                ret = 1;
+            }
+            pctxt->state = end;
+            break;
+        }
+        case XML_SCHEMA_TYPE_ALL:{
+            xmlAutomataStatePtr start, tmp;
+            xmlSchemaParticlePtr sub;
+            xmlSchemaElementPtr elemDecl;
+
+            ret = 1;
+
+            sub = (xmlSchemaParticlePtr) particle->children->children;
+            if (sub == NULL)
+                break;
+
+            ret = 0;
+
+            start = pctxt->state;
+            tmp = xmlAutomataNewState(pctxt->am);
+            xmlAutomataNewEpsilon(pctxt->am, pctxt->state, tmp);
+            pctxt->state = tmp;
+            while (sub != NULL) {
+                pctxt->state = tmp;
+
+                elemDecl = (xmlSchemaElementPtr) sub->children;
+                if (elemDecl == NULL) {
+                    PERROR_INT("xmlSchemaBuildAContentModel",
+                        "<element> particle has no term");
+                    return(ret);
+                };
+                /*
+                * NOTE: The {max occurs} of all the particles in the
+                * {particles} of the group must be 0 or 1; this is
+                * already ensured during the parse of the content of
+                * <all>.
+                */
+                if (elemDecl->flags & XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD) {
+                    int counter;
+
+                    /*
+                     * This is an abstract group, we need to share
+                     * the same counter for all the element transitions
+                     * derived from the group
+                     */
+                    counter = xmlAutomataNewCounter(pctxt->am,
+                                       sub->minOccurs, sub->maxOccurs);
+                    xmlSchemaBuildContentModelForSubstGroup(pctxt,
+                                       sub, counter, pctxt->state);
+                } else {
+                    if ((sub->minOccurs == 1) &&
+                        (sub->maxOccurs == 1)) {
+                        xmlAutomataNewOnceTrans2(pctxt->am, pctxt->state,
+                                                pctxt->state,
+                                                elemDecl->name,
+                                                elemDecl->targetNamespace,
+                                                1, 1, elemDecl);
+                    } else if ((sub->minOccurs == 0) &&
+                        (sub->maxOccurs == 1)) {
+
+                        xmlAutomataNewCountTrans2(pctxt->am, pctxt->state,
+                                                 pctxt->state,
+                                                 elemDecl->name,
+                                                 elemDecl->targetNamespace,
+                                                 0,
+                                                 1,
+                                                 elemDecl);
+                    }
+                }
+                sub = (xmlSchemaParticlePtr) sub->next;
+            }
+            pctxt->state =
+                xmlAutomataNewAllTrans(pctxt->am, pctxt->state, NULL, 0);
+            if (particle->minOccurs == 0) {
+                xmlAutomataNewEpsilon(pctxt->am, start, pctxt->state);
+                ret = 1;
+            }
+            break;
+        }
 	case XML_SCHEMA_TYPE_GROUP:
 	    /*
 	    * If we hit a model group definition, then this means that
@@ -13024,14 +13118,16 @@ xmlSchemaBuildAContentModel(xmlSchemaParserCtxtPtr pctxt,
 	    * TODO: But the group should be substituted and not occur at
 	    * all in the content model at this point. Fix this.
 	    */
+            ret = 1;
 	    break;
         default:
 	    xmlSchemaInternalErr2(ACTXT_CAST pctxt,
 		"xmlSchemaBuildAContentModel",
 		"found unexpected term of type '%s' in content model",
 		WXS_ITEM_TYPE_NAME(particle->children), NULL);
-            return;
+            return(ret);
     }
+    return(ret);
 }
 
 /**
@@ -13878,7 +13974,7 @@ xmlSchemaCheckCOSNSSubset(xmlSchemaWildcardPtr sub,
     */
     if ((sub->negNsSet != NULL) &&
 	(super->negNsSet != NULL) &&
-	(sub->negNsSet->value == sub->negNsSet->value))
+	(sub->negNsSet->value == super->negNsSet->value))
 	return (0);
     /*
     * 3.1 sub must be a set whose members are either namespace names or �absent�.
@@ -15088,9 +15184,10 @@ xmlSchemaCheckSTPropsCorrect(xmlSchemaParserCtxtPtr ctxt,
 	FREE_AND_NULL(str)
 	return (XML_SCHEMAP_ST_PROPS_CORRECT_1);
     }
-    if ( (WXS_IS_LIST(type) || WXS_IS_UNION(type)) &&
-	 (WXS_IS_RESTRICTION(type) == 0) &&
-	 (! WXS_IS_ANY_SIMPLE_TYPE(baseType))) {
+    if ((WXS_IS_LIST(type) || WXS_IS_UNION(type)) &&
+	(WXS_IS_RESTRICTION(type) == 0) &&
+	((! WXS_IS_ANY_SIMPLE_TYPE(baseType)) &&
+         (baseType->type != XML_SCHEMA_TYPE_SIMPLE))) {
 	xmlSchemaPCustomErr(ctxt,
 	    XML_SCHEMAP_ST_PROPS_CORRECT_1,
 	    WXS_BASIC_CAST type, NULL,
@@ -15567,7 +15664,8 @@ xmlSchemaCheckCOSSTRestricts(xmlSchemaParserCtxtPtr pctxt,
 			    return (XML_SCHEMAP_COS_ST_RESTRICTS_3_3_2_3);
 			}
 			member = member->next;
-			baseMember = baseMember->next;
+                        if (baseMember != NULL)
+                            baseMember = baseMember->next;
 		    }
 		}
 	    }
@@ -17289,7 +17387,7 @@ xmlSchemaDeriveAndValidateFacets(xmlSchemaParserCtxtPtr pctxt,
 	flength = bflength;
     if (flength) {
 	if (! fminlen)
-	    flength = bflength;
+	    fminlen = bfminlen;
 	if (fminlen) {
 	    /* (1.1) length >= minLength */
 	    res = xmlSchemaCompareValues(flength->val, fminlen->val);
@@ -18406,8 +18504,8 @@ xmlSchemaFixupComplexType(xmlSchemaParserCtxtPtr pctxt,
 		    particle->children->children =
 			(xmlSchemaTreeItemPtr) xmlSchemaAddParticle(pctxt,
 			type->node,
-			((xmlSchemaParticlePtr) type->subtypes)->minOccurs,
-			((xmlSchemaParticlePtr) type->subtypes)->maxOccurs);
+			((xmlSchemaParticlePtr) baseType->subtypes)->minOccurs,
+			((xmlSchemaParticlePtr) baseType->subtypes)->maxOccurs);
 		    if (particle->children->children == NULL)
 			goto exit_failure;
 		    particle = (xmlSchemaParticlePtr)
@@ -20083,7 +20181,7 @@ xmlSchemaResolveAttrUseReferences(xmlSchemaAttributeUsePtr ause,
 	    ref->name, ref->targetNamespace);
         if (ause->attrDecl == NULL) {
 	    xmlSchemaPResCompAttrErr(ctxt,
-	    	XML_SCHEMAP_SRC_RESOLVE,
+		XML_SCHEMAP_SRC_RESOLVE,
 		WXS_BASIC_CAST ause, ause->node,
 		"ref", ref->name, ref->targetNamespace,
 		XML_SCHEMA_TYPE_ATTRIBUTE, NULL);
@@ -21463,16 +21561,16 @@ xmlSchemaGetWhiteSpaceFacetValue(xmlSchemaTypePtr type)
 }
 
 /************************************************************************
- * 									*
- * 			Simple type validation				*
- * 									*
+ *									*
+ *			Simple type validation				*
+ *									*
  ************************************************************************/
 
 
 /************************************************************************
- * 									*
- * 			DOM Validation code				*
- * 									*
+ *									*
+ *			DOM Validation code				*
+ *									*
  ************************************************************************/
 
 /**
@@ -21866,9 +21964,9 @@ xmlSchemaVAddNodeQName(xmlSchemaValidCtxtPtr vctxt,
 }
 
 /************************************************************************
- * 									*
+ *									*
  *  Validation of identity-constraints (IDC)                            *
- * 									*
+ *									*
  ************************************************************************/
 
 /**
@@ -23653,12 +23751,14 @@ xmlSchemaBubbleIDCNodeTables(xmlSchemaValidCtxtPtr vctxt)
 		parBind->dupls = bind->dupls;
 		bind->dupls = NULL;
 	    }
-	    if (*parTable == NULL)
-		*parTable = parBind;
-	    else {
-		parBind->next = *parTable;
-		*parTable = parBind;
-	    }
+            if (parTable != NULL) {
+                if (*parTable == NULL)
+                    *parTable = parBind;
+                else {
+                    parBind->next = *parTable;
+                    *parTable = parBind;
+                }
+            }
 	}
 
 next_binding:
@@ -23794,9 +23894,9 @@ xmlSchemaCheckCVCIDCKeyRef(xmlSchemaValidCtxtPtr vctxt)
 }
 
 /************************************************************************
- * 									*
- * 			XML Reader validation code                      *
- * 									*
+ *									*
+ *			XML Reader validation code                      *
+ *									*
  ************************************************************************/
 
 static xmlSchemaAttrInfoPtr
@@ -24461,10 +24561,10 @@ xmlSchemaVCheckCVCSimpleType(xmlSchemaAbstractCtxtPtr actxt,
 		    /* ws = xmlSchemaGetWhiteSpaceFacetValue(type); */
 		    if (valNeeded)
 			ret = xmlSchemaValPredefTypeNodeNoNorm(biType,
-			    value, &val, NULL);
+			    value, &val, node);
 		    else
 			ret = xmlSchemaValPredefTypeNodeNoNorm(biType,
-			    value, NULL, NULL);
+			    value, NULL, node);
 		    break;
 	    }
 	} else if (actxt->type == XML_SCHEMA_CTXT_PARSER) {
@@ -24916,9 +25016,9 @@ xmlSchemaValidateElemDecl(xmlSchemaValidCtxtPtr vctxt)
         return (vctxt->err);
     }
     if (actualType == NULL) {
-    	VERROR(XML_SCHEMAV_CVC_TYPE_1, NULL,
-    	    "The type definition is absent");
-    	return (XML_SCHEMAV_CVC_TYPE_1);
+	VERROR(XML_SCHEMAV_CVC_TYPE_1, NULL,
+	    "The type definition is absent");
+	return (XML_SCHEMAV_CVC_TYPE_1);
     }
     if (vctxt->nbAttrInfos != 0) {
 	int ret;
@@ -25008,9 +25108,9 @@ xmlSchemaValidateElemDecl(xmlSchemaValidCtxtPtr vctxt)
     * No actual type definition.
     */
     if (actualType == NULL) {
-    	VERROR(XML_SCHEMAV_CVC_TYPE_1, NULL,
-    	    "The type definition is absent");
-    	return (XML_SCHEMAV_CVC_TYPE_1);
+	VERROR(XML_SCHEMAV_CVC_TYPE_1, NULL,
+	    "The type definition is absent");
+	return (XML_SCHEMAV_CVC_TYPE_1);
     }
     /*
     * Remember the actual type definition.
@@ -25222,7 +25322,6 @@ xmlSchemaVAttributesComplex(xmlSchemaValidCtxtPtr vctxt)
 
     if (vctxt->nbAttrInfos == 0)
 	return (0);
-    nbUses = vctxt->nbAttrInfos;
     /*
     * Validate against the wildcard.
     */
@@ -25313,16 +25412,18 @@ xmlSchemaVAttributesComplex(xmlSchemaValidCtxtPtr vctxt)
 			* whose {attribute declaration}'s {type definition}
 			* is or is derived from ID."
 			*/
-			for (j = 0; j < attrUseList->nbItems; j++) {
-			    if (xmlSchemaIsDerivedFromBuiltInType(
-				WXS_ATTRUSE_TYPEDEF(attrUseList->items[j]),
-				XML_SCHEMAS_ID)) {
-				/* URGENT VAL TODO: implement */
-				iattr->state = XML_SCHEMAS_ATTR_ERR_WILD_AND_USE_ID;
-				TODO
-				break;
-			    }
-			}
+                        if (attrUseList != NULL) {
+                            for (j = 0; j < attrUseList->nbItems; j++) {
+                                if (xmlSchemaIsDerivedFromBuiltInType(
+                                    WXS_ATTRUSE_TYPEDEF(attrUseList->items[j]),
+                                    XML_SCHEMAS_ID)) {
+                                    /* URGENT VAL TODO: implement */
+                            iattr->state = XML_SCHEMAS_ATTR_ERR_WILD_AND_USE_ID;
+                                    TODO
+                                    break;
+                                }
+                            }
+                        }
 		    }
 		} else if (type->attributeWildcard->processContents ==
 		    XML_SCHEMAS_ANY_LAX) {
@@ -25962,6 +26063,20 @@ xmlSchemaValidatorPopElem(xmlSchemaValidCtxtPtr vctxt)
 		    "AUTOMATON create on '%s'\n", inode->localName);
 #endif
 	    }
+
+	    /*
+	     * Do not check further content if the node has been nilled
+	     */
+	    if (INODE_NILLED(inode)) {
+		ret = 0;
+#ifdef DEBUG_AUTOMATA
+		xmlGenericError(xmlGenericErrorContext,
+		    "AUTOMATON succeeded on nilled '%s'\n",
+		    inode->localName);
+#endif
+                goto skip_nilled;
+	    }
+
 	    /*
 	    * Get hold of the still expected content, since a further
 	    * call to xmlRegExecPushString() will loose this information.
@@ -25999,6 +26114,9 @@ xmlSchemaValidatorPopElem(xmlSchemaValidCtxtPtr vctxt)
 
 	}
     }
+
+skip_nilled:
+
     if (inode->typeDef->contentType == XML_SCHEMA_CONTENT_ELEMENTS)
 	goto end_elem;
 
@@ -26739,6 +26857,11 @@ xmlSchemaValidateElem(xmlSchemaValidCtxtPtr vctxt)
 	    vctxt->skipDepth = 0;
 	    return(ret);
 	}
+        /*
+         * Augment the IDC definitions for the main schema and all imported ones
+         * NOTE: main schema is the first in the imported list
+         */
+        xmlHashScan(vctxt->schema->schemasImports,(xmlHashScanner)xmlSchemaAugmentImportedIDC, vctxt);
     }
     if (vctxt->depth > 0) {
 	/*
@@ -26832,15 +26955,15 @@ type_validation:
     if (vctxt->inode->typeDef == NULL) {
 	vctxt->inode->flags |= XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE;
 	ret = XML_SCHEMAV_CVC_TYPE_1;
-    	VERROR(ret, NULL,
-    	    "The type definition is absent");
+	VERROR(ret, NULL,
+	    "The type definition is absent");
 	goto exit;
     }
     if (vctxt->inode->typeDef->flags & XML_SCHEMAS_TYPE_ABSTRACT) {
 	vctxt->inode->flags |= XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE;
 	ret = XML_SCHEMAV_CVC_TYPE_2;
-    	    VERROR(ret, NULL,
-    	    "The type definition is abstract");
+	    VERROR(ret, NULL,
+	    "The type definition is abstract");
 	goto exit;
     }
     /*
@@ -27087,9 +27210,9 @@ internal_error:
 #endif
 
 /************************************************************************
- * 									*
- * 			SAX validation handlers				*
- * 									*
+ *									*
+ *			SAX validation handlers				*
+ *									*
  ************************************************************************/
 
 /*
@@ -27340,9 +27463,9 @@ internal_error:
 }
 
 /************************************************************************
- * 									*
- * 			Validation interfaces				*
- * 									*
+ *									*
+ *			Validation interfaces				*
+ *									*
  ************************************************************************/
 
 /**
@@ -27372,8 +27495,28 @@ xmlSchemaNewValidCtxt(xmlSchemaPtr schema)
 }
 
 /**
+ * xmlSchemaValidateSetFilename:
+ * @vctxt: the schema validation context
+ * @filename: the file name
+ *
+ * Workaround to provide file error reporting information when this is
+ * not provided by current APIs
+ */
+void
+xmlSchemaValidateSetFilename(xmlSchemaValidCtxtPtr vctxt, const char *filename) {
+    if (vctxt == NULL)
+        return;
+    if (vctxt->filename != NULL)
+        xmlFree(vctxt->filename);
+    if (filename != NULL)
+        vctxt->filename = (char *) xmlStrdup((const xmlChar *) filename);
+    else
+        vctxt->filename = NULL;
+}
+
+/**
  * xmlSchemaClearValidCtxt:
- * @ctxt: the schema validation context
+ * @vctxt: the schema validation context
  *
  * Free the resources associated to the schema validation context;
  * leaves some fields alive intended for reuse of the context.
@@ -27474,6 +27617,11 @@ xmlSchemaClearValidCtxt(xmlSchemaValidCtxtPtr vctxt)
     * where the user provides the dict?
     */
     vctxt->dict = xmlDictCreate();
+
+    if (vctxt->filename != NULL) {
+        xmlFree(vctxt->filename);
+	vctxt->filename = NULL;
+    }
 }
 
 /**
@@ -27559,6 +27707,8 @@ xmlSchemaFreeValidCtxt(xmlSchemaValidCtxtPtr ctxt)
 	xmlSchemaItemListFree(ctxt->nodeQNames);
     if (ctxt->dict != NULL)
 	xmlDictFree(ctxt->dict);
+    if (ctxt->filename != NULL)
+	xmlFree(ctxt->filename);
     xmlFree(ctxt);
 }
 
@@ -27713,7 +27863,10 @@ xmlSchemaVDocWalk(xmlSchemaValidCtxtPtr vctxt)
     const xmlChar *nsName;
 
     /* DOC VAL TODO: Move this to the start function. */
-    valRoot = xmlDocGetRootElement(vctxt->doc);
+    if (vctxt->validationRoot != NULL)
+        valRoot = vctxt->validationRoot;
+    else
+	valRoot = xmlDocGetRootElement(vctxt->doc);
     if (valRoot == NULL) {
 	/* VAL TODO: Error code? */
 	VERROR(1, NULL, "The document has no document element");
@@ -28034,9 +28187,9 @@ xmlSchemaValidateDoc(xmlSchemaValidCtxtPtr ctxt, xmlDocPtr doc)
 
 
 /************************************************************************
- * 									*
- * 		Function and data for SAX streaming API			*
- * 									*
+ *									*
+ *		Function and data for SAX streaming API			*
+ *									*
  ************************************************************************/
 typedef struct _xmlSchemaSplitSAXData xmlSchemaSplitSAXData;
 typedef xmlSchemaSplitSAXData *xmlSchemaSplitSAXDataPtr;
@@ -28553,6 +28706,63 @@ xmlSchemaSAXUnplug(xmlSchemaSAXPlugPtr plug)
 }
 
 /**
+ * xmlSchemaValidateSetLocator:
+ * @vctxt: a schema validation context
+ * @f: the locator function pointer
+ * @ctxt: the locator context
+ *
+ * Allows to set a locator function to the validation context,
+ * which will be used to provide file and line information since
+ * those are not provided as part of the SAX validation flow
+ * Setting @f to NULL disable the locator.
+ */
+
+void
+xmlSchemaValidateSetLocator(xmlSchemaValidCtxtPtr vctxt,
+                            xmlSchemaValidityLocatorFunc f,
+			    void *ctxt)
+{
+    if (vctxt == NULL) return;
+    vctxt->locFunc = f;
+    vctxt->locCtxt = ctxt;
+}
+
+/**
+ * xmlSchemaValidateStreamLocator:
+ * @ctx: the xmlTextReaderPtr used
+ * @file: returned file information
+ * @line: returned line information
+ *
+ * Internal locator function for the readers
+ *
+ * Returns 0 in case the Schema validation could be (des)activated and
+ *         -1 in case of error.
+ */
+static int
+xmlSchemaValidateStreamLocator(void *ctx, const char **file,
+                               unsigned long *line) {
+    xmlParserCtxtPtr ctxt;
+
+    if ((ctx == NULL) || ((file == NULL) && (line == NULL)))
+        return(-1);
+
+    if (file != NULL)
+        *file = NULL;
+    if (line != NULL)
+        *line = 0;
+
+    ctxt = (xmlParserCtxtPtr) ctx;
+    if (ctxt->input != NULL) {
+       if (file != NULL)
+           *file = ctxt->input->filename;
+       if (line != NULL)
+           *line = ctxt->input->line;
+       return(0);
+    }
+    return(-1);
+}
+
+/**
  * xmlSchemaValidateStream:
  * @ctxt:  a schema validation context
  * @input:  the input to use for reading the data
@@ -28595,6 +28805,7 @@ xmlSchemaValidateStream(xmlSchemaValidCtxtPtr ctxt,
         xmlCtxtUseOptions(pctxt, options);
 #endif
     pctxt->linenumbers = 1;
+    xmlSchemaValidateSetLocator(ctxt, xmlSchemaValidateStreamLocator, pctxt);
 
     inputStream = xmlNewIOInputStream(pctxt, input, enc);;
     if (inputStream == NULL) {

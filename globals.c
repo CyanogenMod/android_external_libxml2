@@ -46,7 +46,8 @@ static xmlMutexPtr xmlThrDefMutex = NULL;
  */
 void xmlInitGlobals(void)
 {
-    xmlThrDefMutex = xmlNewMutex();
+    if (xmlThrDefMutex == NULL)
+        xmlThrDefMutex = xmlNewMutex();
 }
 
 /**
@@ -64,9 +65,9 @@ void xmlCleanupGlobals(void)
 }
 
 /************************************************************************
- * 									*
+ *									*
  *	All the user accessible global variables of the library		*
- * 									*
+ *									*
  ************************************************************************/
 
 /*
@@ -148,6 +149,7 @@ xmlStrdupFunc xmlMemStrdup = (xmlStrdupFunc) xmlStrdup;
 #undef	xmlGenericError
 #undef	xmlStructuredError
 #undef	xmlGenericErrorContext
+#undef	xmlStructuredErrorContext
 #undef	xmlGetWarningsDefaultValue
 #undef	xmlIndentTreeOutput
 #undef  xmlTreeIndentString
@@ -244,7 +246,7 @@ static int xmlPedanticParserDefaultValueThrDef = 0;
  * xmlLineNumbersDefaultValue:
  *
  * Global setting, indicate that the parser should store the line number
- * in the content field of elements in the DOM tree. 
+ * in the content field of elements in the DOM tree.
  * Disabled by default since this may not be safe for old classes of
  * applicaton.
  */
@@ -314,6 +316,13 @@ static xmlStructuredErrorFunc xmlStructuredErrorThrDef = NULL;
  */
 void *xmlGenericErrorContext = NULL;
 static void *xmlGenericErrorContextThrDef = NULL;
+/**
+ * xmlStructuredErrorContext:
+ *
+ * Global setting passed to structured error callbacks
+ */
+void *xmlStructuredErrorContext = NULL;
+static void *xmlStructuredErrorContextThrDef = NULL;
 xmlError xmlLastError;
 
 /*
@@ -500,7 +509,7 @@ xmlInitializeGlobalState(xmlGlobalStatePtr gs)
 #if defined(LIBXML_DOCB_ENABLED) && defined(LIBXML_LEGACY_ENABLED) && defined(LIBXML_SAX1_ENABLED)
     initdocbDefaultSAXHandler(&gs->docbDefaultSAXHandler);
 #endif
-#if defined(LIBXML_HTML_ENABLED) && defined(LIBXML_LEGACY_ENABLED)
+#if defined(LIBXML_HTML_ENABLED) && defined(LIBXML_LEGACY_ENABLED) && defined(LIBXML_SAX1_ENABLED)
     inithtmlDefaultSAXHandler(&gs->htmlDefaultSAXHandler);
 #endif
 
@@ -514,7 +523,7 @@ xmlInitializeGlobalState(xmlGlobalStatePtr gs)
     gs->xmlDefaultSAXLocator.getSystemId = xmlSAX2GetSystemId;
     gs->xmlDefaultSAXLocator.getLineNumber = xmlSAX2GetLineNumber;
     gs->xmlDefaultSAXLocator.getColumnNumber = xmlSAX2GetColumnNumber;
-    gs->xmlDoValidityCheckingDefaultValue = 
+    gs->xmlDoValidityCheckingDefaultValue =
          xmlDoValidityCheckingDefaultValueThrDef;
 #if defined(DEBUG_MEMORY_LOCATION) | defined(DEBUG_MEMORY)
     gs->xmlFree = (xmlFreeFunc) xmlMemFree;
@@ -539,12 +548,13 @@ xmlInitializeGlobalState(xmlGlobalStatePtr gs)
     gs->xmlParserVersion = LIBXML_VERSION_STRING;
     gs->xmlPedanticParserDefaultValue = xmlPedanticParserDefaultValueThrDef;
     gs->xmlSaveNoEmptyTags = xmlSaveNoEmptyTagsThrDef;
-    gs->xmlSubstituteEntitiesDefaultValue = 
+    gs->xmlSubstituteEntitiesDefaultValue =
         xmlSubstituteEntitiesDefaultValueThrDef;
 
     gs->xmlGenericError = xmlGenericErrorThrDef;
     gs->xmlStructuredError = xmlStructuredErrorThrDef;
     gs->xmlGenericErrorContext = xmlGenericErrorContextThrDef;
+    gs->xmlStructuredErrorContext = xmlStructuredErrorContextThrDef;
     gs->xmlRegisterNodeDefaultValue = xmlRegisterNodeDefaultValueThrDef;
     gs->xmlDeregisterNodeDefaultValue = xmlDeregisterNodeDefaultValueThrDef;
 
@@ -573,7 +583,7 @@ xmlThrDefSetGenericErrorFunc(void *ctx, xmlGenericErrorFunc handler) {
 void
 xmlThrDefSetStructuredErrorFunc(void *ctx, xmlStructuredErrorFunc handler) {
     xmlMutexLock(xmlThrDefMutex);
-    xmlGenericErrorContextThrDef = ctx;
+    xmlStructuredErrorContextThrDef = ctx;
     xmlStructuredErrorThrDef = handler;
     xmlMutexUnlock(xmlThrDefMutex);
 }
@@ -590,7 +600,7 @@ xmlRegisterNodeFunc
 xmlRegisterNodeDefault(xmlRegisterNodeFunc func)
 {
     xmlRegisterNodeFunc old = xmlRegisterNodeDefaultValue;
-    
+
     __xmlRegisterCallbacks = 1;
     xmlRegisterNodeDefaultValue = func;
     return(old);
@@ -600,10 +610,10 @@ xmlRegisterNodeFunc
 xmlThrDefRegisterNodeDefault(xmlRegisterNodeFunc func)
 {
     xmlRegisterNodeFunc old;
-    
+
     xmlMutexLock(xmlThrDefMutex);
     old = xmlRegisterNodeDefaultValueThrDef;
-    
+
     __xmlRegisterCallbacks = 1;
     xmlRegisterNodeDefaultValueThrDef = func;
     xmlMutexUnlock(xmlThrDefMutex);
@@ -623,7 +633,7 @@ xmlDeregisterNodeFunc
 xmlDeregisterNodeDefault(xmlDeregisterNodeFunc func)
 {
     xmlDeregisterNodeFunc old = xmlDeregisterNodeDefaultValue;
-    
+
     __xmlRegisterCallbacks = 1;
     xmlDeregisterNodeDefaultValue = func;
     return(old);
@@ -636,7 +646,7 @@ xmlThrDefDeregisterNodeDefault(xmlDeregisterNodeFunc func)
 
     xmlMutexLock(xmlThrDefMutex);
     old = xmlDeregisterNodeDefaultValueThrDef;
-    
+
     __xmlRegisterCallbacks = 1;
     xmlDeregisterNodeDefaultValueThrDef = func;
     xmlMutexUnlock(xmlThrDefMutex);
@@ -648,7 +658,7 @@ xmlParserInputBufferCreateFilenameFunc
 xmlThrDefParserInputBufferCreateFilenameDefault(xmlParserInputBufferCreateFilenameFunc func)
 {
     xmlParserInputBufferCreateFilenameFunc old;
-    
+
     xmlMutexLock(xmlThrDefMutex);
     old = xmlParserInputBufferCreateFilenameValueThrDef;
     if (old == NULL) {
@@ -665,7 +675,7 @@ xmlOutputBufferCreateFilenameFunc
 xmlThrDefOutputBufferCreateFilenameDefault(xmlOutputBufferCreateFilenameFunc func)
 {
     xmlOutputBufferCreateFilenameFunc old;
-    
+
     xmlMutexLock(xmlThrDefMutex);
     old = xmlOutputBufferCreateFilenameValueThrDef;
 #ifdef LIBXML_OUTPUT_ENABLED
@@ -722,7 +732,7 @@ __xmlMalloc(void){
     if (IS_MAIN_THREAD)
         return (&xmlMalloc);
     else
-    	return (&xmlGetGlobalState()->xmlMalloc);
+	return (&xmlGetGlobalState()->xmlMalloc);
 }
 
 #undef xmlMallocAtomic
@@ -876,6 +886,15 @@ __xmlGenericErrorContext(void) {
 	return (&xmlGetGlobalState()->xmlGenericErrorContext);
 }
 
+#undef	xmlStructuredErrorContext
+void * *
+__xmlStructuredErrorContext(void) {
+    if (IS_MAIN_THREAD)
+	return (&xmlStructuredErrorContext);
+    else
+	return (&xmlGetGlobalState()->xmlStructuredErrorContext);
+}
+
 #undef	xmlGetWarningsDefaultValue
 int *
 __xmlGetWarningsDefaultValue(void) {
@@ -910,7 +929,7 @@ int xmlThrDefIndentTreeOutput(int v) {
     return ret;
 }
 
-#undef xmlTreeIndentString
+#undef	xmlTreeIndentString
 const char * *
 __xmlTreeIndentString(void) {
     if (IS_MAIN_THREAD)

@@ -4,6 +4,7 @@ LOCAL_PATH:= $(call my-dir)
 # and the host (as a static library for tools to use).
 
 common_SRC_FILES := \
+	buf.c \
 	SAX.c \
 	entities.c \
 	encoding.c \
@@ -65,6 +66,18 @@ LOCAL_MODULE:= libxml2
 
 include $(BUILD_STATIC_LIBRARY)
 
+# Shared library
+#=======================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE:= libxml2
+
+LOCAL_SRC_FILES := $(common_SRC_FILES)
+LOCAL_C_INCLUDES := $(common_C_INCLUDES) external/icu4c/common
+LOCAL_SHARED_LIBRARIES := $(common_SHARED_LIBRARIES) libicuuc libdl
+LOCAL_CFLAGS :=
+LOCAL_PRELINK_MODULE := false
+
+include $(BUILD_SHARED_LIBRARY)
 
 # For the host
 # ========================================================
