@@ -945,7 +945,7 @@ struct _xmlXPathCompExpr {
     xmlXPathStepOp *steps;	/* ops for computation of this expression */
     int last;			/* index of last step in expression */
     xmlChar *expr;		/* the expression being computed */
-    xmlDictPtr dict;		/* the dictionnary to use if any */
+    xmlDictPtr dict;		/* the dictionary to use if any */
 #ifdef DEBUG_EVAL_COUNTS
     int nb;
     xmlChar *string;
@@ -3706,7 +3706,7 @@ xmlXPathNodeSetAdd(xmlNodeSetPtr cur, xmlNodePtr val) {
 
     /* @@ with_ns to check whether namespace nodes should be looked at @@ */
     /*
-     * prevent duplcates
+     * prevent duplicates
      */
     for (i = 0;i < cur->nodeNr;i++)
         if (cur->nodeTab[i] == val) return(0);
@@ -9996,7 +9996,7 @@ xmlXPathParseNameComplex(xmlXPathParserContextPtr ctxt, int qualified) {
         (c == '[') || (c == ']') || (c == '@') || /* accelerators */
         (c == '*') || /* accelerators */
 	(!IS_LETTER(c) && (c != '_') &&
-         ((qualified) && (c != ':')))) {
+         ((!qualified) || (c != ':')))) {
 	return(NULL);
     }
 
@@ -12379,11 +12379,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                     STRANGE
 		    goto error;
                 case NODE_TEST_TYPE:
-		    /*
-		    * TODO: Don't we need to use
-		    *  xmlXPathNodeSetAddNs() for namespace nodes here?
-		    *  Surprisingly, some c14n tests fail, if we do this.
-		    */
 		    if (type == NODE_TYPE_NODE) {
 			switch (cur->type) {
 			    case XML_DOCUMENT_NODE:
@@ -12397,9 +12392,16 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 			    case XML_COMMENT_NODE:
 			    case XML_CDATA_SECTION_NODE:
 			    case XML_TEXT_NODE:
-			    case XML_NAMESPACE_DECL:
 				XP_TEST_HIT
 				break;
+			    case XML_NAMESPACE_DECL: {
+				if (axis == AXIS_NAMESPACE) {
+				    XP_TEST_HIT_NS
+				} else {
+				    XP_TEST_HIT
+				}
+				break;
+                            }
 			    default:
 				break;
 			}
@@ -14783,6 +14785,10 @@ xmlXPathOptimizeExpression(xmlXPathCompExprPtr comp, xmlXPathStepOpPtr op)
             }
 	}
     }
+
+    /* OP_VALUE has invalid ch1. */
+    if (op->op == XPATH_OP_VALUE)
+        return;
 
     /* Recurse */
     if (op->ch1 != -1)
